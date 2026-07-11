@@ -2,6 +2,12 @@
 
 A personal, offline-first expense tracker built as a lightweight PWA (Progressive Web App). Made for tracking every rupee of daily spending — food, travel, recharges, AI subscriptions and more — right from your phone.
 
+## 📸 Screenshots
+
+| Add Expense | Dashboard | History | Recurring & Limits |
+|:---:|:---:|:---:|:---:|
+| ![Add Expense](screenshots/IMG_1695.png) | ![Dashboard](screenshots/IMG_1696.png) | ![History](screenshots/IMG_1697.png) | ![Recurring & Limits](screenshots/IMG_1698.png) |
+
 ## ✨ Features
 
 - **Monthly budget wallet** — set your total amount once; every expense auto-deducts and shows Total / Spent / Left
