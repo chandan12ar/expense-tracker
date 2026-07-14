@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0f1220">
-<title>My Expense Tracker</title><!-- v3 PWA -->
+<title>My Expense Tracker</title><!-- v4 PWA - custom categories -->
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -239,6 +239,7 @@ var KEY  = 'expense_tracker_v1';
 var BKEY = 'expense_budget_v1';
 var RKEY = 'expense_recur_v1';
 var LKEY = 'expense_limits_v1';
+var CKEY = 'expense_customcats_v1';
 
 var CATS = [
   {n:'Food – Self', i:'🍜', c:'#ffb26b'},
@@ -266,6 +267,10 @@ var txs     = lsGet(KEY, []);
 var budgets = lsGet(BKEY, {def:0, m:{}});
 var recur   = lsGet(RKEY, []);
 var limits  = lsGet(LKEY, {});
+var customCats = lsGet(CKEY, []);
+function persistCats(){ localStorage.setItem(CKEY, JSON.stringify(customCats)); }
+function allCats(){ return CATS.concat(customCats); }
+var PALETTE = ['#60a5fa','#f59e0b','#2dd4bf','#f43f5e','#a3e635','#fb923c','#38bdf8','#eab308'];
 
 var selCat = null, selPay = 'PhonePe';
 var viewYM = ym(new Date());
@@ -282,8 +287,9 @@ function ym(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2
 function iso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function inr(n){ return '₹' + Number(n).toLocaleString('en-IN', {maximumFractionDigits: n % 1 ? 2 : 0}); }
 function catInfo(name){
-  for (var k=0;k<CATS.length;k++) if (CATS[k].n===name) return CATS[k];
-  return CATS[CATS.length-1];
+  var A = allCats();
+  for (var k=0;k<A.length;k++) if (A[k].n===name) return A[k];
+  return {n:name, i:'🏷️', c:'#94a3b8'};
 }
 function monthName(ymStr){
   var p = ymStr.split('-');
@@ -367,7 +373,7 @@ function renderQuick(){
 function sortedCats(){
   var count = {};
   txs.forEach(function(t){ count[t.cat] = (count[t.cat]||0)+1; });
-  return CATS.slice().sort(function(a,b){ return (count[b.n]||0) - (count[a.n]||0); });
+  return allCats().sort(function(a,b){ return (count[b.n]||0) - (count[a.n]||0); });
 }
 function renderChips(){
   var box = document.getElementById('catChips'); box.innerHTML='';
@@ -378,6 +384,14 @@ function renderChips(){
     b.onclick = function(){ selCat = c.n; renderChips(); };
     box.appendChild(b);
   });
+  var addB = document.createElement('button');
+  addB.className = 'chip';
+  addB.style.background = 'transparent';
+  addB.style.border = '1.5px dashed #7c6cff';
+  addB.style.color = '#9aa3c7';
+  addB.textContent = '＋ New';
+  addB.onclick = addCategory;
+  box.appendChild(addB);
   var pb = document.getElementById('payChips'); pb.innerHTML='';
   PAYS.forEach(function(pName){
     var b = document.createElement('button');
@@ -387,6 +401,37 @@ function renderChips(){
     pb.appendChild(b);
   });
   renderLimitHint();
+}
+function addCategory(){
+  var v = prompt('New category name (tip: start with an emoji, e.g. 🐶 Pet Care):');
+  if (v === null) return;
+  v = v.trim();
+  if (!v){ flash('Enter a name', true); return; }
+  var icon = '🏷️';
+  var chars = Array.from(v);
+  if (chars.length && chars[0].codePointAt(0) > 0x2000){
+    icon = chars[0];
+    var rest = v.slice(chars[0].length).trim();
+    if (rest) v = rest;
+  }
+  if (v.length > 24) v = v.slice(0, 24);
+  var A = allCats();
+  for (var k=0;k<A.length;k++){
+    if (A[k].n.toLowerCase() === v.toLowerCase()){ flash('Category already exists', true); return; }
+  }
+  customCats.push({ n: v, i: icon, c: PALETTE[customCats.length % PALETTE.length] });
+  persistCats();
+  selCat = v;
+  renderChips();
+  flash('Category added: ' + icon + ' ' + v);
+}
+function delCategory(name){
+  if (!confirm('Remove category "' + name + '"? Existing expenses keep their name.')) return;
+  customCats = customCats.filter(function(c){ return c.n !== name; });
+  delete limits[name];
+  persistCats(); persistLimits();
+  renderLimits(); renderChips();
+  flash('Category removed');
 }
 function renderLimitHint(){
   var el = document.getElementById('limitHint');
@@ -589,7 +634,7 @@ function renderDash(){
 /* ---------- history ---------- */
 function renderHist(){
   var fb = document.getElementById('histFilter');
-  var names = ['All'].concat(CATS.map(function(c){ return c.n; }));
+  var names = ['All'].concat(allCats().map(function(c){ return c.n; }));
   fb.innerHTML='';
   names.forEach(function(n){
     var b = document.createElement('button');
@@ -690,9 +735,7 @@ function renderRecur(){
     }).join('');
   }
   var sel = document.getElementById('recCat');
-  if (!sel.options || !sel.options.length){
-    sel.innerHTML = CATS.map(function(c){ return '<option value="' + c.n + '">' + c.i + ' ' + c.n + '</option>'; }).join('');
-  }
+  sel.innerHTML = allCats().map(function(c){ return '<option value="' + c.n + '">' + c.i + ' ' + c.n + '</option>'; }).join('');
 }
 function addRecur(){
   var amt = parseFloat(document.getElementById('recAmt').value);
@@ -719,10 +762,13 @@ function delRecur(id){
 /* ---------- limits ---------- */
 function renderLimits(){
   var box = document.getElementById('limList');
-  box.innerHTML = CATS.map(function(c){
+  box.innerHTML = allCats().map(function(c){
     var lim = limits[c.n];
-    return '<div class="limRow"><span>' + c.i + ' ' + c.n + (lim ? ' · <b>' + inr(lim) + '</b>/mo' : '') + '</span>' +
-      '<button class="setLim" onclick="setLimit(\'' + c.n.replace(/'/g, "\\'") + '\')">' + (lim ? 'Edit' : 'Set') + '</button></div>';
+    var isCustom = customCats.some(function(x){ return x.n === c.n; });
+    return '<div class="limRow"><span>' + c.i + ' ' + c.n + (lim ? ' \u00b7 <b>' + inr(lim) + '</b>/mo' : '') + (isCustom ? ' <span style="font-size:.65rem;color:var(--accent2)">custom</span>' : '') + '</span><span>' +
+      '<button class="setLim" onclick="setLimit(\'' + c.n.replace(/'/g, "\\'") + '\')">' + (lim ? 'Edit' : 'Set') + '</button>' +
+      (isCustom ? '<button class="setLim" style="color:var(--danger);margin-left:6px" onclick="delCategory(\'' + c.n.replace(/'/g, "\\'") + '\')">\u2715</button>' : '') +
+      '</span></div>';
   }).join('');
 }
 function setLimit(cat){
@@ -746,7 +792,7 @@ function downloadFile(name, content, mime){
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 function exportJSON(){
-  var payload = { v: 3, txs: txs, budgets: budgets, recur: recur, limits: limits };
+  var payload = { v: 4, txs: txs, budgets: budgets, recur: recur, limits: limits, cats: customCats };
   downloadFile('expenses-backup-' + iso(new Date()) + '.json', JSON.stringify(payload, null, 1), 'application/json');
   flash('Backup downloaded');
 }
@@ -779,6 +825,7 @@ function importJSON(input){
         if (data.budgets){ budgets = data.budgets; persistBudgets(); }
         if (data.recur){ recur = data.recur; persistRecur(); }
         if (data.limits){ limits = data.limits; persistLimits(); }
+        if (data.cats){ customCats = data.cats; persistCats(); }
       }
       persist(); renderBudget();
       flash('Restored ' + added + ' entries ✓');

@@ -1,5 +1,5 @@
 /* Offline cache for My Expense Tracker */
-var CACHE = 'expenses-v3';
+var CACHE = 'expenses-v4';
 var ASSETS = ['./', './index.html', './manifest.json', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', function(e){
